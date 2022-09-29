@@ -8,9 +8,6 @@ import os
 
 load_dotenv()
 
-def format_timestamp(date):
- return pd.to_datetime(date).apply(lambda x: x.strftime('%Y-%m-%d'))
-
 
 class Twitter():
   def __init__(self):
@@ -94,6 +91,9 @@ class Twitter():
     dict_metrics = OrderedDict()
 
     response = json.loads(self.oauth.get(f'https://api.twitter.com/2/tweets?ids={ids}&tweet.fields=public_metrics,non_public_metrics').text)
+    
+    if 'errors' in response.keys():
+      return
 
     for tweet in response['data']:
       dict_metrics[tweet['text']] = dict(tweet['public_metrics'], **tweet['non_public_metrics'])
@@ -105,7 +105,7 @@ class Twitter():
     df_keys = df_keys.reset_index()
 
     df_final = df_metrics.merge(df_keys, on='index')
-    df_final.rename(columns={0: 'tweet'}, inplace=True)
+    df_final.rename(columns={0: 'text'}, inplace=True)
     df_final.drop('index', axis=1, inplace=True)
 
     return df_final
