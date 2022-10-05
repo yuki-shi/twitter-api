@@ -5,9 +5,9 @@ from requests_oauthlib import OAuth1Session
 from collections import OrderedDict
 from dotenv import load_dotenv
 import os
+import datetime as dt
 
 load_dotenv()
-
 
 class Twitter():
   def __init__(self):
@@ -15,7 +15,8 @@ class Twitter():
     self.secret = os.getenv('SECRET')
     self.token = os.getenv('TOKEN')
     self.oauth = self.init_twitter()
-    self.usr_id = self.get_user_id(os.getenv('USER'))
+    self.user = os.environ['USER']
+    self.usr_id = self.get_user_id(self.user)
 
   def init_twitter(self):
     request_token_url = "https://api.twitter.com/oauth/request_token"
@@ -79,11 +80,18 @@ class Twitter():
       else:
         url = f'https://api.twitter.com/2/users/{self.usr_id}/tweets?tweet.fields=created_at&max_results=100&exclude=replies&pagination_token={next_token}'
 
-      response = json.loads(self.oauth.get(url).text)
+      response = self.oauth.get(url)
+      # TODO: checar  status
+      response = json.loads(response.text)
       json_final.append(response['data'])
       next_token = response['meta']['next_token']
 
-    return pd.DataFrame([item for sublist in json_final for item in sublist])
+    df = pd.DataFrame([item for sublist in json_final for item in sublist])
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['created_at'] -= dt.timedelta(hours=3) # GMT-03:00
+    df['permalink'] = [f'https://twitter.com/{self.user}/status/{x}' for x in df['id']]
+
+    return df
 
 
   # Retorna DataFrame contendo métricas públicas e não-públicas dos tweets inputados
@@ -91,9 +99,6 @@ class Twitter():
     dict_metrics = OrderedDict()
 
     response = json.loads(self.oauth.get(f'https://api.twitter.com/2/tweets?ids={ids}&tweet.fields=public_metrics,non_public_metrics').text)
-    
-    if 'errors' in response.keys():
-      return
 
     for tweet in response['data']:
       dict_metrics[tweet['text']] = dict(tweet['public_metrics'], **tweet['non_public_metrics'])
@@ -105,7 +110,7 @@ class Twitter():
     df_keys = df_keys.reset_index()
 
     df_final = df_metrics.merge(df_keys, on='index')
-    df_final.rename(columns={0: 'text'}, inplace=True)
+    df_final.rename(columns={0: 'tweet'}, inplace=True)
     df_final.drop('index', axis=1, inplace=True)
 
     return df_final
