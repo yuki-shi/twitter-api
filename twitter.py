@@ -79,12 +79,17 @@ class Twitter():
         url = f'https://api.twitter.com/2/users/{self.usr_id}/tweets?tweet.fields=created_at&max_results={max}&exclude=replies'#'#&start_time={data_inicial}'#&end_time={data_final}'
       else:
         url = f'https://api.twitter.com/2/users/{self.usr_id}/tweets?tweet.fields=created_at&max_results=100&exclude=replies&pagination_token={next_token}'
-
+        
       response = self.oauth.get(url)
       # TODO: checar  status
       response = json.loads(response.text)
       json_final.append(response['data'])
-      next_token = response['meta']['next_token']
+      
+      if 'next_token' in response['meta'].keys():
+        next_token = response['meta']['next_token']
+        
+      else:
+        break
 
     df = pd.DataFrame([item for sublist in json_final for item in sublist])
     df['created_at'] = pd.to_datetime(df['created_at'])
