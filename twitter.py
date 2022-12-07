@@ -72,29 +72,26 @@ class Twitter():
   # Retorna DataFrame contendo os últimos 300 tweets do usuário
   def get_tweets(self):
     max = 100
-    json_final = []
+    url = f'https://api.twitter.com/2/users/{twitter.usr_id}/tweets?tweet.fields=created_at&max_results={max}&exclude=replies'#'#&start_time={data_inicial}'#&end_time={data_final}'
 
-    for i in range(3):
-      if i == 0:
-        url = f'https://api.twitter.com/2/users/{self.usr_id}/tweets?tweet.fields=created_at&max_results={max}&exclude=replies'#'#&start_time={data_inicial}'#&end_time={data_final}'
-      else:
-        url = f'https://api.twitter.com/2/users/{self.usr_id}/tweets?tweet.fields=created_at&max_results=100&exclude=replies&pagination_token={next_token}'
-        
-      response = self.oauth.get(url)
-      # TODO: checar  status
-      response = json.loads(response.text)
-      json_final.append(response['data'])
-      
-      if 'next_token' in response['meta'].keys():
+    response = json.loads(twitter.oauth.get(url).text)
+
+    if 'next_token' in response['meta'].keys():
+      json_final = []
+      next_token = response['meta']['next_token']
+
+      while 'next_token' in response['meta'].keys():
+        url = f'https://api.twitter.com/2/users/{twitter.usr_id}/tweets?tweet.fields=created_at&max_results={max}&exclude=replies&pagination_token={next_token}'
+        response = json.loads(twitter.oauth.get(url).text)
+        json_final.append(response['data'])
         next_token = response['meta']['next_token']
-        
-      else:
-        break
 
-    df = pd.DataFrame([item for sublist in json_final for item in sublist])
+      df = pd.DataFrame([item for sublist in json_final for item in sublist])
+
+    df = pd.DataFrame(response['data'])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df['created_at'] -= dt.timedelta(hours=3) # GMT-03:00
-    df['permalink'] = [f'https://twitter.com/{self.user}/status/{x}' for x in df['id']]
+    df['permalink'] = [f'https://twitter.com/{twitter.user}/status/{x}' for x in df['id']]
 
     return df
 
